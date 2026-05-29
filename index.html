@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Elvix AI — Your Smart Tech Assistant</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css"/>
+</head>
+<body>
+
+  <div class="cursor-dot"></div>
+  <div class="cursor-ring"></div>
+
+  <div id="loader">
+    <div class="loader-logo">Elvix <span>AI</span></div>
+    <div class="loader-bar"><div class="loader-fill"></div></div>
+    <p class="loader-text">Initializing Elvix AI...</p>
+  </div>
+
+  <div class="bg">
+    <div class="orb orb1"></div>
+    <div class="orb orb2"></div>
+    <div class="orb orb3"></div>
+  </div>
+
+  <div id="tsparticles"></div>
+
+  <div class="app">
+
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-top">
+        <div class="sidebar-logo">Elvix <span>AI</span></div>
+        <button class="close-sidebar" onclick="toggleSidebar()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <button class="new-chat-btn" onclick="newChat()">
+        <i class="fas fa-plus"></i> New Chat
+      </button>
+      <div class="chat-history" id="chatHistory">
+        <p class="history-label">Recent Chats</p>
+      </div>
+      <div class="sidebar-bottom">
+        <a href="https://sireen123.github.io/elvix-technologies" target="_blank" class="back-link">
+          <i class="fas fa-arrow-left"></i> Elvix Website
+        </a>
+        <p class="sidebar-copy">&copy; 2025 Elvix Technologies</p>
+      </div>
+    </div>
+
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+    <div class="chat-area">
+
+      <div class="chat-header">
+        <div class="ai-info">
+          <button class="menu-btn" onclick="toggleSidebar()">
+            <i class="fas fa-bars"></i>
+          </button>
+          <div class="ai-avatar">
+            <i class="fas fa-robot"></i>
+            <span class="online-dot"></span>
+          </div>
+          <div>
+            <h3>Elvix AI</h3>
+            <p>Powered by Elvix Technologies</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button onclick="clearChat()" title="Clear chat">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="messages" id="messages">
+        <div class="welcome" id="welcome">
+          <div class="welcome-icon">&#129302;</div>
+          <h2>Hi! I'm <span>Elvix AI</span></h2>
+          <p>Your smart tech assistant by Elvix Technologies.<br/>Ask me anything — I can search the web too!</p>
+          <div class="suggestions">
+            <button class="suggest-btn" onclick="sendSuggestion(this)">Who is Tamil Nadu CM?</button>
+            <button class="suggest-btn" onclick="sendSuggestion(this)">Latest AI news today</button>
+            <button class="suggest-btn" onclick="sendSuggestion(this)">Help with Android app</button>
+            <button class="suggest-btn" onclick="sendSuggestion(this)">Final year project ideas</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <div class="input-box">
+          <textarea
+            id="userInput"
+            placeholder="Ask Elvix AI anything..."
+            rows="1"
+            onkeydown="handleKey(event)"
+            oninput="autoResize(this)"
+          ></textarea>
+          <button class="send-btn" onclick="sendMessage()" id="sendBtn">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </div>
+        <p class="input-note">Elvix AI searches the web for current info &#127758;</p>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js"></script>
+  <script>
+
+    const OPENROUTER_KEY = "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";
+    const TAVILY_KEY = "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";
+    const MODEL = "openrouter/auto";
+
+    const SYSTEM_PROMPT = `You are Elvix AI, a smart and friendly tech assistant created by Elvix Technologies, a Chennai-based tech startup founded by Sireen.
+
+You help users with:
+- Web development (HTML, CSS, JavaScript, React)
+- Android app development (Java, Kotlin, Firebase)
+- AI and Machine Learning projects
+- Student final year projects
+- General tech questions and coding help
+- Career advice in tech
+- Current news and updates (you have web search access)
+
+IMPORTANT RULES:
+- You are Elvix AI made by Elvix Technologies. Never say you are Claude, Gemini or any other AI.
+- If someone asks who made you say "I am Elvix AI made by Elvix Technologies"
+- Be friendly, energetic and encouraging
+- Give clear step by step answers
+- Use simple language
+- Add code examples when needed
+- Remember what user said earlier in conversation
+- NEVER argue with the user. If user corrects you, say "Thanks for the update!" and accept it
+- When you have web search results, use them to give accurate current answers
+- Do NOT sign off messages with any tagline
+- Keep responses clean and helpful
+- Today's date is: ${new Date().toDateString()}`;
+
+    let messages = [];
+    const MAX_MEMORY = 30;
+    let isLoading = false;
+
+    // NEEDS SEARCH — decides if question needs web search
+    function needsSearch(text) {
+      const searchKeywords = [
+        'who is', 'what is', 'when did', 'where is', 'latest', 'current',
+        'today', 'news', 'now', 'recent', 'cm', 'minister', 'president',
+        'price', 'cost', 'winner', 'result', 'score', 'match', 'election',
+        'died', 'death', 'born', 'age', 'released', 'launch', 'new',
+        'trending', 'happening', 'update', 'live', '2024', '2025', '2026'
+      ];
+      const lower = text.toLowerCase();
+      return searchKeywords.some(k => lower.includes(k));
+    }
+
+    // WEB SEARCH using Tavily
+    async function searchWeb(query) {
+      try {
+        const response = await fetch('https://api.tavily.com/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            api_key: TAVILY_KEY,
+            query: query,
+            search_depth: 'basic',
+            max_results: 4,
+            include_answer: true
+          })
+        });
+        const data = await response.json();
+        if (data.answer) return data.answer;
+        if (data.results && data.results.length > 0) {
+          return data.results.slice(0, 3).map(r => `${r.title}: ${r.content}`).join('\n\n');
+        }
+        return null;
+      } catch (err) {
+        console.error('Search error:', err);
+        return null;
+      }
+    }
+
+    // LOADER
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        document.getElementById('loader').classList.add('hide');
+      }, 2500);
+    });
+
+    // CURSOR
+    const dot = document.querySelector('.cursor-dot');
+    const ring = document.querySelector('.cursor-ring');
+    document.addEventListener('mousemove', e => {
+      dot.style.left = e.clientX + 'px';
+      dot.style.top = e.clientY + 'px';
+      setTimeout(() => {
+        ring.style.left = e.clientX + 'px';
+        ring.style.top = e.clientY + 'px';
+      }, 80);
+    });
+
+    // PARTICLES
+    tsParticles.load("tsparticles", {
+      particles: {
+        number: { value: 40 },
+        color: { value: ["#7c5cfc", "#00d4aa"] },
+        opacity: { value: 0.15 },
+        size: { value: { min: 1, max: 2 } },
+        move: { enable: true, speed: 0.4 },
+        links: { enable: true, distance: 120, color: "#7c5cfc", opacity: 0.06 }
+      },
+      background: { color: "transparent" }
+    });
+
+    // SIDEBAR
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebarOverlay').classList.toggle('active');
+    }
+
+    // SEND MESSAGE
+    async function sendMessage() {
+      if (isLoading) return;
+      const input = document.getElementById('userInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      input.value = '';
+      autoResize(input);
+      hideWelcome();
+      isLoading = true;
+
+      addMessage('user', text);
+      messages.push({ role: 'user', content: text });
+
+      const typingId = showTyping();
+
+      try {
+        // SEARCH WEB if needed
+        let searchContext = '';
+        if (needsSearch(text)) {
+          showSearching(typingId);
+          const searchResult = await searchWeb(text);
+          if (searchResult) {
+            searchContext = `\n\nWEB SEARCH RESULTS (use this for accurate answer):\n${searchResult}\n\nAnswer based on above search results.`;
+          }
+        }
+
+        // BUILD MESSAGES with search context
+        const messagesWithContext = [...messages];
+        if (searchContext) {
+          messagesWithContext[messagesWithContext.length - 1] = {
+            role: 'user',
+            content: text + searchContext
+          };
+        }
+
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENROUTER_KEY}`,
+            'HTTP-Referer': 'https://sireen123.github.io/elvix-ai',
+            'X-Title': 'Elvix AI'
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: [
+              { role: 'system', content: SYSTEM_PROMPT },
+              ...messagesWithContext
+            ],
+            max_tokens: 2048,
+            temperature: 0.8
+          })
+        });
+
+        const data = await response.json();
+        removeTyping(typingId);
+
+        if (!response.ok) {
+          addMessage('ai', '⚠️ ' + (data?.error?.message || 'Something went wrong!'));
+          isLoading = false;
+          return;
+        }
+
+        const reply = data?.choices?.[0]?.message?.content;
+        if (!reply) {
+          addMessage('ai', 'Could not generate response. Please try again!');
+          isLoading = false;
+          return;
+        }
+
+        addMessage('ai', reply, searchContext ? true : false);
+        messages.push({ role: 'assistant', content: reply });
+
+        if (messages.length > MAX_MEMORY) {
+          messages = messages.slice(messages.length - MAX_MEMORY);
+        }
+
+        saveToHistory(text);
+
+      } catch (err) {
+        removeTyping(typingId);
+        addMessage('ai', '⚠️ Network error! Check your internet and try again.');
+      }
+
+      isLoading = false;
+    }
+
+    // SHOW SEARCHING STATUS
+    function showSearching(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        const dots = el.querySelector('.typing-dots');
+        if (dots) {
+          dots.innerHTML = '<span style="width:auto;height:auto;background:none;animation:none;font-size:0.75rem;color:rgba(255,255,255,0.5)">&#127758; Searching web...</span>';
+        }
+      }
+    }
+
+    // ADD MESSAGE
+    function addMessage(role, text, searched = false) {
+      const msgs = document.getElementById('messages');
+      const div = document.createElement('div');
+      div.classList.add('message', role === 'user' ? 'user-msg' : 'ai-msg');
+
+      const formatted = text
+        .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+        .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+        .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\n/g, '<br/>');
+
+      div.innerHTML = `
+        ${role === 'ai' ? '<div class="ai-avatar-small"><i class="fas fa-robot"></i></div>' : ''}
+        <div class="bubble">
+          ${role === 'ai' ? `<span class="ai-name">Elvix AI ${searched ? '<span class="web-badge">&#127758; web</span>' : ''}</span>` : ''}
+          <p>${formatted}</p>
+          <span class="msg-time">${getTime()}</span>
+        </div>
+      `;
+
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;
+
+      div.style.opacity = '0';
+      div.style.transform = 'translateY(16px)';
+      requestAnimationFrame(() => {
+        div.style.transition = 'all 0.35s ease';
+        div.style.opacity = '1';
+        div.style.transform = 'translateY(0)';
+      });
+    }
+
+    // TYPING
+    function showTyping() {
+      const msgs = document.getElementById('messages');
+      const id = 'typing-' + Date.now();
+      const div = document.createElement('div');
+      div.classList.add('message', 'ai-msg');
+      div.id = id;
+      div.innerHTML = `
+        <div class="ai-avatar-small"><i class="fas fa-robot"></i></div>
+        <div class="bubble typing-bubble">
+          <span class="ai-name">Elvix AI</span>
+          <div class="typing-dots">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+      `;
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;
+      return id;
+    }
+
+    function removeTyping(id) {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    }
+
+    function sendSuggestion(btn) {
+      document.getElementById('userInput').value = btn.textContent;
+      sendMessage();
+    }
+
+    function hideWelcome() {
+      const w = document.getElementById('welcome');
+      if (w) w.style.display = 'none';
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    }
+
+    function autoResize(el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+    }
+
+    function getTime() {
+      return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function clearChat() {
+      messages = [];
+      isLoading = false;
+      document.getElementById('messages').innerHTML = `
+        <div class="welcome" id="welcome">
+          <div class="welcome-icon">&#129302;</div>
+          <h2>Hi! I'm <span>Elvix AI</span></h2>
+          <p>Your smart tech assistant by Elvix Technologies.<br/>Ask me anything — I can search the web too!</p>
+          <div class="suggestions">
+            <button class="suggest-btn" onclick="sendSuggestion(this)">Who is Tamil Nadu CM?</button>
+            <button class="suggest-btn" onclick="sendSuggestion(this)">Latest AI news today</button>
+            <button class="suggest-btn" onclick="sendSuggestion(this)">Help with Android app</button>
+            <button class="suggest-btn" onclick="sendSuggestion(this)">Final year project ideas</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function newChat() { clearChat(); }
+
+    function saveToHistory(text) {
+      const history = document.getElementById('chatHistory');
+      const item = document.createElement('div');
+      item.classList.add('history-item');
+      item.innerHTML = `<i class="fas fa-comment"></i> ${text.slice(0, 26)}${text.length > 26 ? '...' : ''}`;
+      const label = history.querySelector('.history-label');
+      history.insertBefore(item, label.nextSibling);
+      const items = history.querySelectorAll('.history-item');
+      if (items.length > 8) items[items.length - 1].remove();
+    }
+
+  </script>
+</body>
+</html>
