@@ -79,10 +79,10 @@
         <div class="welcome" id="welcome">
           <div class="welcome-icon">&#129302;</div>
           <h2>Hi! I'm <span>Elvix AI</span></h2>
-          <p>Your smart tech assistant by Elvix Technologies.<br/>Ask me anything — I can search the web too!</p>
+          <p>Ask me anything — I can search web, generate images and listen to your voice!</p>
           <div class="suggestions">
             <button class="suggest-btn" onclick="sendSuggestion(this)">Who is Tamil Nadu CM?</button>
-            <button class="suggest-btn" onclick="sendSuggestion(this)">Latest AI news today</button>
+            <button class="suggest-btn" onclick="sendSuggestion(this)">Generate image of sunset</button>
             <button class="suggest-btn" onclick="sendSuggestion(this)">Help with Android app</button>
             <button class="suggest-btn" onclick="sendSuggestion(this)">Final year project ideas</button>
           </div>
@@ -91,9 +91,12 @@
 
       <div class="input-area" id="inputArea">
         <div class="input-box">
+          <button class="voice-btn" id="voiceBtn" onclick="toggleVoice()" title="Voice input">
+            <i class="fas fa-microphone"></i>
+          </button>
           <textarea
             id="userInput"
-            placeholder="Ask Elvix AI anything..."
+            placeholder="Ask anything or say 'generate image of...'"
             rows="1"
             onkeydown="handleKey(event)"
             oninput="autoResize(this)"
@@ -104,7 +107,7 @@
             <i class="fas fa-paper-plane"></i>
           </button>
         </div>
-        <p class="input-note">Elvix AI searches the web for current info &#127758;</p>
+        <p class="input-note">&#127758; Web search &nbsp;|&nbsp; &#127912; Image gen &nbsp;|&nbsp; &#127908; Voice input</p>
       </div>
 
     </div>
@@ -117,111 +120,58 @@
     const TAVILY_KEY = "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";
     const MODEL = "openrouter/auto";
 
-    const SYSTEM_PROMPT = `You are Elvix AI, a smart and friendly tech assistant created by Elvix Technologies, a Chennai-based tech startup founded by Sireen.
+    const SYSTEM_PROMPT = `You are Elvix AI, a smart tech assistant by Elvix Technologies, Chennai. Founded by Sireen.
 
-You help users with:
-- Web development (HTML, CSS, JavaScript, React)
-- Android app development (Java, Kotlin, Firebase)
-- AI and Machine Learning projects
-- Student final year projects
-- General tech questions and coding help
-- Career advice in tech
-- Current news and updates (you have web search access)
+Rules:
+- You are Elvix AI by Elvix Technologies. Never say you are any other AI.
+- Be SHORT and DIRECT. Max 3-4 lines unless code is needed.
+- Use bullet points for lists.
+- Give code only when asked.
+- Be friendly but concise like a smart friend texting you.
+- Never argue. Accept corrections immediately.
+- No sign-offs or taglines.
+- Today: ${new Date().toDateString()}
 
-IMPORTANT RULES:
-- You are Elvix AI made by Elvix Technologies. Never say you are Claude, Gemini or any other AI.
-- If someone asks who made you say "I am Elvix AI made by Elvix Technologies"
-- Be friendly, energetic and encouraging
-- Give clear step by step answers
-- Use simple language
-- Add code examples when needed
-- Remember what user said earlier in conversation
-- NEVER argue with the user. If user corrects you, say "Thanks for the update!" and accept it
-- When you have web search results, use them to give accurate current answers
-- Do NOT sign off messages with any tagline
-- Keep responses clean and helpful
-- Today's date is: ${new Date().toDateString()}`;
+You help with: web dev, Android apps, AI/ML, student projects, tech careers, current news.`;
 
     let messages = [];
-    const MAX_MEMORY = 30;
+    const MAX_MEMORY = 20;
     let isLoading = false;
+    let isListening = false;
+    let voiceUsed = false; // tracks if current message was sent by voice
+    let recognition = null;
+    let synth = window.speechSynthesis;
 
-    // MOBILE KEYBOARD FIX
+    // ====== MOBILE KEYBOARD FIX ======
     function handleFocus() {
       if (window.innerWidth <= 768) {
         setTimeout(() => {
           document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-          document.getElementById('inputArea').scrollIntoView({ behavior: 'smooth', block: 'end' });
         }, 300);
       }
     }
 
     function handleBlur() {
       if (window.innerWidth <= 768) {
-        setTimeout(() => {
-          window.scrollTo(0, 0);
-        }, 100);
+        setTimeout(() => window.scrollTo(0, 0), 100);
       }
     }
 
-    // VISUAL VIEWPORT FIX for mobile keyboard
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', () => {
         if (window.innerWidth <= 768) {
-          const app = document.getElementById('app');
-          app.style.height = window.visualViewport.height + 'px';
+          document.getElementById('app').style.height = window.visualViewport.height + 'px';
           document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
         }
       });
     }
 
-    // NEEDS SEARCH
-    function needsSearch(text) {
-      const searchKeywords = [
-        'who is', 'what is', 'when did', 'where is', 'latest', 'current',
-        'today', 'news', 'now', 'recent', 'cm', 'minister', 'president',
-        'price', 'cost', 'winner', 'result', 'score', 'match', 'election',
-        'died', 'death', 'born', 'age', 'released', 'launch', 'new',
-        'trending', 'happening', 'update', 'live', '2024', '2025', '2026'
-      ];
-      const lower = text.toLowerCase();
-      return searchKeywords.some(k => lower.includes(k));
-    }
-
-    // WEB SEARCH
-    async function searchWeb(query) {
-      try {
-        const response = await fetch('https://api.tavily.com/search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            api_key: TAVILY_KEY,
-            query: query,
-            search_depth: 'basic',
-            max_results: 4,
-            include_answer: true
-          })
-        });
-        const data = await response.json();
-        if (data.answer) return data.answer;
-        if (data.results && data.results.length > 0) {
-          return data.results.slice(0, 3).map(r => `${r.title}: ${r.content}`).join('\n\n');
-        }
-        return null;
-      } catch (err) {
-        console.error('Search error:', err);
-        return null;
-      }
-    }
-
-    // LOADER
+    // ====== LOADER ======
     window.addEventListener('load', () => {
-      setTimeout(() => {
-        document.getElementById('loader').classList.add('hide');
-      }, 2500);
+      setTimeout(() => document.getElementById('loader').classList.add('hide'), 2500);
     });
 
-    // CURSOR
+    // ====== CURSOR ======
     const dot = document.querySelector('.cursor-dot');
     const ring = document.querySelector('.cursor-ring');
     document.addEventListener('mousemove', e => {
@@ -233,7 +183,7 @@ IMPORTANT RULES:
       }, 80);
     });
 
-    // PARTICLES
+    // ====== PARTICLES ======
     tsParticles.load("tsparticles", {
       particles: {
         number: { value: 40 },
@@ -246,26 +196,154 @@ IMPORTANT RULES:
       background: { color: "transparent" }
     });
 
-    // SIDEBAR
+    // ====== SIDEBAR ======
     function toggleSidebar() {
       document.getElementById('sidebar').classList.toggle('open');
       document.getElementById('sidebarOverlay').classList.toggle('active');
     }
 
-    // SEND MESSAGE
+    // ====== IMAGE DETECTION ======
+    function isImageRequest(text) {
+      const keywords = ['generate image', 'create image', 'draw', 'make image',
+        'generate a picture', 'show image', 'create a picture', 'generate photo',
+        'image of', 'picture of', 'draw me', 'create art'];
+      return keywords.some(k => text.toLowerCase().includes(k));
+    }
+
+    // ====== IMAGE GENERATION ======
+    function generateImage(prompt) {
+      const clean = prompt
+        .replace(/generate image of|create image of|draw|make image of|image of|picture of|draw me|create art of|generate a picture of|show image of/gi, '')
+        .trim();
+      return `https://image.pollinations.ai/prompt/${encodeURIComponent(clean)}?width=512&height=512&nologo=true`;
+    }
+
+    // ====== NEEDS SEARCH ======
+    function needsSearch(text) {
+      const keywords = [
+        'who is', 'what is', 'when did', 'where is', 'latest', 'current',
+        'today', 'news', 'now', 'recent', 'cm', 'minister', 'president',
+        'price', 'cost', 'winner', 'result', 'score', 'match', 'election',
+        'died', 'death', 'born', 'age', 'released', 'launch', 'trending',
+        'happening', 'update', 'live', '2024', '2025', '2026'
+      ];
+      return keywords.some(k => text.toLowerCase().includes(k));
+    }
+
+    // ====== WEB SEARCH ======
+    async function searchWeb(query) {
+      try {
+        const res = await fetch('https://api.tavily.com/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            api_key: TAVILY_KEY,
+            query,
+            search_depth: 'basic',
+            max_results: 3,
+            include_answer: true
+          })
+        });
+        const data = await res.json();
+        if (data.answer) return data.answer;
+        if (data.results?.length) return data.results.slice(0, 2).map(r => `${r.title}: ${r.content}`).join('\n\n');
+        return null;
+      } catch { return null; }
+    }
+
+    // ====== VOICE INPUT ======
+    function toggleVoice() {
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        addMessage('ai', 'Voice not supported in this browser. Try Chrome!', false, false);
+        return;
+      }
+
+      if (isListening) {
+        recognition.stop();
+        return;
+      }
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.lang = 'en-IN';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        isListening = true;
+        document.getElementById('voiceBtn').classList.add('listening');
+        document.getElementById('userInput').placeholder = 'Listening...';
+      };
+
+      recognition.onresult = (e) => {
+        const transcript = e.results[0][0].transcript;
+        document.getElementById('userInput').value = transcript;
+        autoResize(document.getElementById('userInput'));
+        voiceUsed = true; // mark as voice input
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        document.getElementById('voiceBtn').classList.remove('listening');
+        document.getElementById('userInput').placeholder = 'Ask anything or say generate image of...';
+        if (document.getElementById('userInput').value.trim()) {
+          sendMessage();
+        }
+      };
+
+      recognition.onerror = () => {
+        isListening = false;
+        voiceUsed = false;
+        document.getElementById('voiceBtn').classList.remove('listening');
+      };
+
+      recognition.start();
+    }
+
+    // ====== VOICE OUTPUT ======
+    function speakText(text) {
+      if (!synth) return;
+      synth.cancel();
+      const clean = text.replace(/<[^>]*>/g, '').replace(/[*`#]/g, '').slice(0, 300);
+      const utterance = new SpeechSynthesisUtterance(clean);
+      utterance.lang = 'en-IN';
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      synth.speak(utterance);
+    }
+
+    // ====== SEND MESSAGE ======
     async function sendMessage() {
       if (isLoading) return;
       const input = document.getElementById('userInput');
       const text = input.value.trim();
       if (!text) return;
 
+      const wasVoice = voiceUsed; // save before reset
+      voiceUsed = false; // reset for next message
+
       input.value = '';
       autoResize(input);
       hideWelcome();
       isLoading = true;
 
-      addMessage('user', text);
+      addMessage('user', text, false, wasVoice);
       messages.push({ role: 'user', content: text });
+
+      // IMAGE GENERATION
+      if (isImageRequest(text)) {
+        const typingId = showTyping();
+        setTimeout(() => {
+          removeTyping(typingId);
+          const imgUrl = generateImage(text);
+          addImageMessage(imgUrl, text);
+          if (wasVoice) speakText('Here is your generated image!');
+          messages.push({ role: 'assistant', content: `Generated image for: ${text}` });
+          saveToHistory(text);
+          isLoading = false;
+        }, 1500);
+        return;
+      }
 
       const typingId = showTyping();
 
@@ -273,15 +351,13 @@ IMPORTANT RULES:
         let searchContext = '';
         if (needsSearch(text)) {
           showSearching(typingId);
-          const searchResult = await searchWeb(text);
-          if (searchResult) {
-            searchContext = `\n\nWEB SEARCH RESULTS (use this for accurate answer):\n${searchResult}\n\nAnswer based on above search results.`;
-          }
+          const result = await searchWeb(text);
+          if (result) searchContext = `\n\nWEB SEARCH RESULTS:\n${result}\n\nAnswer using this.`;
         }
 
-        const messagesWithContext = [...messages];
+        const msgContext = [...messages];
         if (searchContext) {
-          messagesWithContext[messagesWithContext.length - 1] = {
+          msgContext[msgContext.length - 1] = {
             role: 'user',
             content: text + searchContext
           };
@@ -299,10 +375,10 @@ IMPORTANT RULES:
             model: MODEL,
             messages: [
               { role: 'system', content: SYSTEM_PROMPT },
-              ...messagesWithContext
+              ...msgContext
             ],
-            max_tokens: 2048,
-            temperature: 0.8
+            max_tokens: 1024,
+            temperature: 0.7
           })
         });
 
@@ -310,21 +386,23 @@ IMPORTANT RULES:
         removeTyping(typingId);
 
         if (!response.ok) {
-          addMessage('ai', '⚠️ ' + (data?.error?.message || 'Something went wrong!'));
+          addMessage('ai', '⚠️ ' + (data?.error?.message || 'Something went wrong!'), false, false);
           isLoading = false;
           return;
         }
 
         const reply = data?.choices?.[0]?.message?.content;
         if (!reply) {
-          addMessage('ai', 'Could not generate response. Please try again!');
+          addMessage('ai', 'Could not generate response. Try again!', false, false);
           isLoading = false;
           return;
         }
 
-        addMessage('ai', reply, searchContext ? true : false);
-        messages.push({ role: 'assistant', content: reply });
+        // Only speak if original message was voice
+        addMessage('ai', reply, !!searchContext, false);
+        if (wasVoice) speakText(reply);
 
+        messages.push({ role: 'assistant', content: reply });
         if (messages.length > MAX_MEMORY) {
           messages = messages.slice(messages.length - MAX_MEMORY);
         }
@@ -333,23 +411,14 @@ IMPORTANT RULES:
 
       } catch (err) {
         removeTyping(typingId);
-        addMessage('ai', '⚠️ Network error! Check your internet and try again.');
+        addMessage('ai', '⚠️ Network error! Check internet and try again.', false, false);
       }
 
       isLoading = false;
     }
 
-    function showSearching(id) {
-      const el = document.getElementById(id);
-      if (el) {
-        const dots = el.querySelector('.typing-dots');
-        if (dots) {
-          dots.innerHTML = '<span style="width:auto;height:auto;background:none;animation:none;font-size:0.75rem;color:rgba(255,255,255,0.5)">&#127758; Searching web...</span>';
-        }
-      }
-    }
-
-    function addMessage(role, text, searched = false) {
+    // ====== ADD TEXT MESSAGE ======
+    function addMessage(role, text, searched = false, isVoice = false) {
       const msgs = document.getElementById('messages');
       const div = document.createElement('div');
       div.classList.add('message', role === 'user' ? 'user-msg' : 'ai-msg');
@@ -362,10 +431,20 @@ IMPORTANT RULES:
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
         .replace(/\n/g, '<br/>');
 
+      // Show voice icon on user message if sent by voice
+      const voiceTag = (role === 'user' && isVoice) ? '<span class="voice-tag"><i class="fas fa-microphone"></i></span>' : '';
+
       div.innerHTML = `
         ${role === 'ai' ? '<div class="ai-avatar-small"><i class="fas fa-robot"></i></div>' : ''}
         <div class="bubble">
-          ${role === 'ai' ? `<span class="ai-name">Elvix AI ${searched ? '<span class="web-badge">&#127758; web</span>' : ''}</span>` : ''}
+          ${role === 'ai' ? `
+            <div class="msg-header">
+              <span class="ai-name">Elvix AI${searched ? ' <span class="web-badge">&#127758; web</span>' : ''}</span>
+              <button class="speak-btn" onclick="speakText(this.closest('.bubble').querySelector('p').innerText)" title="Read aloud">
+                <i class="fas fa-volume-up"></i>
+              </button>
+            </div>` : ''}
+          ${voiceTag}
           <p>${formatted}</p>
           <span class="msg-time">${getTime()}</span>
         </div>
@@ -383,6 +462,43 @@ IMPORTANT RULES:
       });
     }
 
+    // ====== ADD IMAGE MESSAGE ======
+    function addImageMessage(imgUrl, prompt) {
+      const msgs = document.getElementById('messages');
+      const div = document.createElement('div');
+      div.classList.add('message', 'ai-msg');
+
+      div.innerHTML = `
+        <div class="ai-avatar-small"><i class="fas fa-robot"></i></div>
+        <div class="bubble">
+          <div class="msg-header">
+            <span class="ai-name">Elvix AI <span class="img-badge">&#127912; image</span></span>
+          </div>
+          <p style="font-size:0.78rem;color:rgba(255,255,255,0.4);margin-bottom:0.5rem;">${prompt}</p>
+          <div class="img-container">
+            <img src="${imgUrl}" alt="Generated" onload="this.parentElement.classList.add('loaded')" onerror="this.parentElement.innerHTML='<p style=padding:1rem;color:rgba(255,255,255,0.4)>Image failed. Try again!</p>'"/>
+            <div class="img-loading"><i class="fas fa-spinner fa-spin"></i> Generating...</div>
+          </div>
+          <a href="${imgUrl}" target="_blank" class="download-btn">
+            <i class="fas fa-download"></i> Download
+          </a>
+          <span class="msg-time">${getTime()}</span>
+        </div>
+      `;
+
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;
+
+      div.style.opacity = '0';
+      div.style.transform = 'translateY(16px)';
+      requestAnimationFrame(() => {
+        div.style.transition = 'all 0.35s ease';
+        div.style.opacity = '1';
+        div.style.transform = 'translateY(0)';
+      });
+    }
+
+    // ====== TYPING ======
     function showTyping() {
       const msgs = document.getElementById('messages');
       const id = 'typing-' + Date.now();
@@ -393,9 +509,7 @@ IMPORTANT RULES:
         <div class="ai-avatar-small"><i class="fas fa-robot"></i></div>
         <div class="bubble typing-bubble">
           <span class="ai-name">Elvix AI</span>
-          <div class="typing-dots">
-            <span></span><span></span><span></span>
-          </div>
+          <div class="typing-dots"><span></span><span></span><span></span></div>
         </div>
       `;
       msgs.appendChild(div);
@@ -408,7 +522,16 @@ IMPORTANT RULES:
       if (el) el.remove();
     }
 
+    function showSearching(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        const dots = el.querySelector('.typing-dots');
+        if (dots) dots.innerHTML = '<span style="width:auto;height:auto;background:none;animation:none;font-size:0.75rem;color:rgba(255,255,255,0.5)">&#127758; Searching web...</span>';
+      }
+    }
+
     function sendSuggestion(btn) {
+      voiceUsed = false;
       document.getElementById('userInput').value = btn.textContent;
       sendMessage();
     }
@@ -421,6 +544,7 @@ IMPORTANT RULES:
     function handleKey(e) {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
+        voiceUsed = false;
         sendMessage();
       }
     }
@@ -437,14 +561,16 @@ IMPORTANT RULES:
     function clearChat() {
       messages = [];
       isLoading = false;
+      voiceUsed = false;
+      if (synth) synth.cancel();
       document.getElementById('messages').innerHTML = `
         <div class="welcome" id="welcome">
           <div class="welcome-icon">&#129302;</div>
           <h2>Hi! I'm <span>Elvix AI</span></h2>
-          <p>Your smart tech assistant by Elvix Technologies.<br/>Ask me anything — I can search the web too!</p>
+          <p>Ask me anything — I can search web, generate images and listen to your voice!</p>
           <div class="suggestions">
             <button class="suggest-btn" onclick="sendSuggestion(this)">Who is Tamil Nadu CM?</button>
-            <button class="suggest-btn" onclick="sendSuggestion(this)">Latest AI news today</button>
+            <button class="suggest-btn" onclick="sendSuggestion(this)">Generate image of sunset</button>
             <button class="suggest-btn" onclick="sendSuggestion(this)">Help with Android app</button>
             <button class="suggest-btn" onclick="sendSuggestion(this)">Final year project ideas</button>
           </div>
