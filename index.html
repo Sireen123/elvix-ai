@@ -126,9 +126,15 @@
   <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js"></script>
   <script>
 
-    const OPENROUTER_KEY = "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";
+    // ============================================================
+    // CHANGE: Replaced OpenRouter with Google Gemini (free tier)
+    // Get your FREE key at: https://aistudio.google.com/apikey
+    // ============================================================
+    const GEMINI_KEY = "AQ.Ab8RN6JR521GyHecQvxFb9R_f-21Enuwiww-zCYbz4j8Lc6djg";
+    const GEMINI_MODEL = "gemini-2.5-flash";
+    const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`;
+
     const TAVILY_KEY = "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";
-    const MODEL = "openrouter/auto";
 
     const SYSTEM_PROMPT = `You are Elvix AI — India's smartest student tech assistant, created by Elvix Technologies, Chennai. Founded by Sireen.
 
@@ -164,7 +170,6 @@ STRICT RULES:
     let recognition = null;
     let synth = window.speechSynthesis;
 
-    // REAL PEOPLE / PLACES keywords
     const REAL_PEOPLE = [
       'modi', 'vijay', 'stalin', 'rahman', 'rajinikanth', 'kamal', 'ajith',
       'actor', 'actress', 'politician', 'celebrity', 'minister', 'president',
@@ -175,7 +180,6 @@ STRICT RULES:
       'ambani', 'tata', 'narendra', 'mamata', 'kejriwal', 'yogi'
     ];
 
-    // MOBILE KEYBOARD FIX
     function handleFocus() {
       if (window.innerWidth <= 768) {
         setTimeout(() => {
@@ -199,12 +203,10 @@ STRICT RULES:
       });
     }
 
-    // LOADER
     window.addEventListener('load', () => {
       setTimeout(() => document.getElementById('loader').classList.add('hide'), 2500);
     });
 
-    // CURSOR
     const dot = document.querySelector('.cursor-dot');
     const ring = document.querySelector('.cursor-ring');
     document.addEventListener('mousemove', e => {
@@ -216,7 +218,6 @@ STRICT RULES:
       }, 80);
     });
 
-    // PARTICLES
     tsParticles.load("tsparticles", {
       particles: {
         number: { value: 35 },
@@ -229,13 +230,11 @@ STRICT RULES:
       background: { color: "transparent" }
     });
 
-    // SIDEBAR
     function toggleSidebar() {
       document.getElementById('sidebar').classList.toggle('open');
       document.getElementById('sidebarOverlay').classList.toggle('active');
     }
 
-    // DETECT IF IMAGE REQUEST
     function isImageRequest(text) {
       const t = text.toLowerCase();
       const imageWords = [
@@ -247,26 +246,22 @@ STRICT RULES:
       return imageWords.some(k => t.includes(k));
     }
 
-    // DETECT IF REAL PERSON
     function isRealPerson(text) {
       const t = text.toLowerCase();
       return REAL_PEOPLE.some(k => t.includes(k));
     }
 
-    // CLEAN PROMPT
     function cleanPrompt(text) {
       return text
         .replace(/hi |hello |generate the image of|generate image of|create image of|draw|make image of|image of|picture of|draw me|create art of|generate a picture of|make a photo of|generate photo of|show me/gi, '')
         .trim();
     }
 
-    // GENERATE AI IMAGE
     function generateImage(prompt) {
       const enhanced = prompt + ', ultra realistic, high quality, 4k, detailed, sharp focus, professional photography';
       return `https://image.pollinations.ai/prompt/${encodeURIComponent(enhanced)}?width=768&height=768&model=flux&nologo=true&enhance=true&seed=${Math.floor(Math.random() * 9999)}`;
     }
 
-    // NEEDS SEARCH
     function needsSearch(text) {
       const keywords = [
         'who is', 'what is', 'when did', 'where is', 'latest', 'current',
@@ -278,7 +273,6 @@ STRICT RULES:
       return keywords.some(k => text.toLowerCase().includes(k));
     }
 
-    // WEB SEARCH
     async function searchWeb(query) {
       try {
         const res = await fetch('https://api.tavily.com/search', {
@@ -299,7 +293,6 @@ STRICT RULES:
       } catch { return null; }
     }
 
-    // VOICE INPUT
     function toggleVoice() {
       if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
         addMessage('ai', 'Voice not supported here. Please use Chrome!');
@@ -342,7 +335,6 @@ STRICT RULES:
       recognition.start();
     }
 
-    // VOICE OUTPUT
     function speakText(text) {
       if (!synth) return;
       synth.cancel();
@@ -354,7 +346,61 @@ STRICT RULES:
       synth.speak(utt);
     }
 
-    // SEND MESSAGE
+    // ============================================================
+    // CHANGE: callGemini replaces the OpenRouter fetch call
+    // Gemini API format is different from OpenAI/OpenRouter format
+    // ============================================================
+    async function callGemini(userText, searchContext) {
+      // Build conversation history in Gemini format
+      const geminiContents = [];
+
+      // Add previous messages (skip last user msg, we'll add it with context)
+      for (let i = 0; i < messages.length - 1; i++) {
+        geminiContents.push({
+          role: messages[i].role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: messages[i].content }]
+        });
+      }
+
+      // Add current user message (with optional search context)
+      const finalUserText = searchContext
+        ? userText + '\n\nWEB SEARCH RESULTS:\n' + searchContext + '\n\nUse this for accurate answer.'
+        : userText;
+
+      geminiContents.push({
+        role: 'user',
+        parts: [{ text: finalUserText }]
+      });
+
+      const body = {
+        system_instruction: {
+          parts: [{ text: SYSTEM_PROMPT }]
+        },
+        contents: geminiContents,
+        generationConfig: {
+          maxOutputTokens: 1024,
+          temperature: 0.7
+        }
+      };
+
+      const response = await fetch(GEMINI_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const errMsg = data?.error?.message || 'Something went wrong!';
+        throw new Error(errMsg);
+      }
+
+      const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!reply) throw new Error('No response from Gemini.');
+      return reply;
+    }
+
     async function sendMessage() {
       if (isLoading) return;
       const input = document.getElementById('userInput');
@@ -401,51 +447,13 @@ STRICT RULES:
         if (needsSearch(text)) {
           showSearching(typingId);
           const result = await searchWeb(text);
-          if (result) searchContext = `\n\nWEB SEARCH RESULTS:\n${result}\n\nUse this for accurate answer.`;
+          if (result) searchContext = result;
         }
 
-        const msgContext = [...messages];
-        if (searchContext) {
-          msgContext[msgContext.length - 1] = {
-            role: 'user', content: text + searchContext
-          };
-        }
+        // CHANGE: Use Gemini instead of OpenRouter
+        const reply = await callGemini(text, searchContext);
 
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${OPENROUTER_KEY}`,
-            'HTTP-Referer': 'https://sireen123.github.io/elvix-ai',
-            'X-Title': 'Elvix AI'
-          },
-          body: JSON.stringify({
-            model: MODEL,
-            messages: [
-              { role: 'system', content: SYSTEM_PROMPT },
-              ...msgContext
-            ],
-            max_tokens: 1024,
-            temperature: 0.7
-          })
-        });
-
-        const data = await response.json();
         removeTyping(typingId);
-
-        if (!response.ok) {
-          addMessage('ai', '⚠️ ' + (data?.error?.message || 'Something went wrong!'));
-          isLoading = false;
-          return;
-        }
-
-        const reply = data?.choices?.[0]?.message?.content;
-        if (!reply) {
-          addMessage('ai', 'Could not generate response. Try again!');
-          isLoading = false;
-          return;
-        }
-
         addMessage('ai', reply, !!searchContext);
         if (wasVoice) speakText(reply);
 
@@ -453,15 +461,14 @@ STRICT RULES:
         if (messages.length > MAX_MEMORY) messages = messages.slice(-MAX_MEMORY);
         saveToHistory(text);
 
-      } catch {
+      } catch(err) {
         removeTyping(typingId);
-        addMessage('ai', '⚠️ Network error! Check internet and try again.');
+        addMessage('ai', '⚠️ ' + (err.message || 'Network error! Check internet and try again.'));
       }
 
       isLoading = false;
     }
 
-    // ADD TEXT MESSAGE
     function addMessage(role, text, searched = false, isVoice = false) {
       const msgs = document.getElementById('messages');
       const div = document.createElement('div');
@@ -500,7 +507,6 @@ STRICT RULES:
       animateIn(div);
     }
 
-    // ADD PERSON SEARCH MESSAGE
     function addPersonMessage(query) {
       const msgs = document.getElementById('messages');
       const div = document.createElement('div');
@@ -534,7 +540,6 @@ STRICT RULES:
       animateIn(div);
     }
 
-    // ADD AI IMAGE MESSAGE
     function addImageMessage(imgUrl, prompt) {
       const msgs = document.getElementById('messages');
       const div = document.createElement('div');
@@ -568,7 +573,6 @@ STRICT RULES:
       animateIn(div);
     }
 
-    // ANIMATE IN
     function animateIn(div) {
       div.style.opacity = '0';
       div.style.transform = 'translateY(16px)';
@@ -579,7 +583,6 @@ STRICT RULES:
       });
     }
 
-    // TYPING INDICATOR
     function showTyping() {
       const msgs = document.getElementById('messages');
       const id = 'typing-' + Date.now();
