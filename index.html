@@ -47,7 +47,7 @@
           <span onclick="sendSuggestion(this)">&#127891; Final Year Projects</span>
           <span onclick="sendSuggestion(this)">&#128241; Android Apps</span>
           <span onclick="sendSuggestion(this)">&#127760; Web Dev</span>
-          <span onclick="sendSuggestion(this)">&#129302; AI & ML</span>
+          <span onclick="sendSuggestion(this)">&#129302; AI &amp; ML</span>
           <span onclick="sendSuggestion(this)">&#128188; Career Help</span>
         </div>
       </div>
@@ -65,7 +65,6 @@
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
     <div class="chat-area">
-
       <div class="chat-header">
         <div class="ai-info">
           <button class="menu-btn" onclick="toggleSidebar()">
@@ -93,9 +92,9 @@
           <h2>Hi! I'm <span>Elvix AI</span></h2>
           <p>India's smartest student tech assistant.<br/>Final year projects, apps, web dev — I got you!</p>
           <div class="suggestions">
-            <button class="suggest-btn" onclick="sendSuggestion(this)">Give me final year project ideas</button>
-            <button class="suggest-btn" onclick="sendSuggestion(this)">Help me build an Android app</button>
-            <button class="suggest-btn" onclick="sendSuggestion(this)">Generate image of mountains</button>
+            <button class="suggest-btn" onclick="sendSuggestion(this)">Give me project ideas</button>
+            <button class="suggest-btn" onclick="sendSuggestion(this)">Help with Android app</button>
+            <button class="suggest-btn" onclick="sendSuggestion(this)">Generate image of sunset</button>
             <button class="suggest-btn" onclick="sendSuggestion(this)">Latest tech news today</button>
           </div>
         </div>
@@ -115,13 +114,12 @@
             onfocus="handleFocus()"
             onblur="handleBlur()"
           ></textarea>
-          <button class="send-btn" onclick="sendMessage()" id="sendBtn">
+          <button class="send-btn" onclick="sendMessage()">
             <i class="fas fa-paper-plane"></i>
           </button>
         </div>
         <p class="input-note">&#127758; Web search &nbsp;|&nbsp; &#127912; Images &nbsp;|&nbsp; &#127908; Voice &nbsp;|&nbsp; &#127891; Student focused</p>
       </div>
-
     </div>
   </div>
 
@@ -134,7 +132,7 @@
 
     const SYSTEM_PROMPT = `You are Elvix AI — India's smartest student tech assistant, created by Elvix Technologies, Chennai. Founded by Sireen.
 
-YOUR SPECIALITY — You excel at:
+YOUR SPECIALITY:
 1. Final year project ideas and guidance (BE/BTech/MCA/BCA)
 2. Android app development (Java, Kotlin, Firebase)
 3. Web development (HTML, CSS, JS, React)
@@ -148,16 +146,15 @@ PERSONALITY:
 - For code/steps — use numbered lists or code blocks
 - Never give unnecessary long paragraphs
 - Be confident and energetic
-- If someone asks a project idea — give 3 specific ideas with brief description
+- If someone asks project ideas — give 3 specific ideas with brief description
 - If someone asks for code — give clean working code with comments
 
 STRICT RULES:
 - You are Elvix AI by Elvix Technologies. NEVER say you are any other AI.
-- NEVER argue. If corrected, say "Got it! Thanks for the update" and move on.
-- No sign-offs or taglines at end of messages.
-- Today's date: ${new Date().toDateString()}
-- When web search results are provided, use them for accurate answers.
-- For real people photos — tell user to search on Google and provide search link.`;
+- NEVER argue. If corrected say "Got it! Thanks for the update" and move on.
+- No sign-offs or taglines.
+- Today: ${new Date().toDateString()}
+- Use web search results when provided.`;
 
     let messages = [];
     const MAX_MEMORY = 20;
@@ -167,7 +164,18 @@ STRICT RULES:
     let recognition = null;
     let synth = window.speechSynthesis;
 
-    // ====== MOBILE KEYBOARD FIX ======
+    // REAL PEOPLE / PLACES keywords
+    const REAL_PEOPLE = [
+      'modi', 'vijay', 'stalin', 'rahman', 'rajinikanth', 'kamal', 'ajith',
+      'actor', 'actress', 'politician', 'celebrity', 'minister', 'president',
+      'prime minister', 'cm ', 'rahul', 'obama', 'trump', 'elon', 'musk',
+      'ronaldo', 'messi', 'sachin', 'dhoni', 'kohli', 'taylor', 'swift',
+      'shah rukh', 'salman', 'aamir', 'deepika', 'priyanka', 'anushka',
+      'nayanthara', 'samantha', 'trisha', 'suriya', 'dhanush', 'vikram',
+      'ambani', 'tata', 'narendra', 'mamata', 'kejriwal', 'yogi'
+    ];
+
+    // MOBILE KEYBOARD FIX
     function handleFocus() {
       if (window.innerWidth <= 768) {
         setTimeout(() => {
@@ -191,12 +199,12 @@ STRICT RULES:
       });
     }
 
-    // ====== LOADER ======
+    // LOADER
     window.addEventListener('load', () => {
       setTimeout(() => document.getElementById('loader').classList.add('hide'), 2500);
     });
 
-    // ====== CURSOR ======
+    // CURSOR
     const dot = document.querySelector('.cursor-dot');
     const ring = document.querySelector('.cursor-ring');
     document.addEventListener('mousemove', e => {
@@ -208,7 +216,7 @@ STRICT RULES:
       }, 80);
     });
 
-    // ====== PARTICLES ======
+    // PARTICLES
     tsParticles.load("tsparticles", {
       particles: {
         number: { value: 35 },
@@ -221,39 +229,44 @@ STRICT RULES:
       background: { color: "transparent" }
     });
 
-    // ====== SIDEBAR ======
+    // SIDEBAR
     function toggleSidebar() {
       document.getElementById('sidebar').classList.toggle('open');
       document.getElementById('sidebarOverlay').classList.toggle('active');
     }
 
-    // ====== DETECT REQUEST TYPES ======
+    // DETECT IF IMAGE REQUEST
     function isImageRequest(text) {
       const t = text.toLowerCase();
-      const imageWords = ['generate image', 'create image', 'make image', 'draw',
+      const imageWords = [
+        'generate image', 'create image', 'make image', 'draw',
         'generate a picture', 'create a picture', 'generate photo',
-        'image of', 'picture of', 'draw me', 'create art', 'make a photo'];
-      const personWords = ['photo of', 'pic of', 'picture of', 'image of', 'show me',
-        'who looks like', 'face of', 'show photo'];
-      const isImg = imageWords.some(k => t.includes(k));
-      const hasPerson = personWords.some(k => t.includes(k));
-      const hasPersonName = /[A-Z][a-z]+ [A-Z][a-z]+/.test(text) || // Detects names like "CM Vijay"
-        t.includes('cm ') || t.includes('minister') || t.includes('actor') ||
-        t.includes('actress') || t.includes('celebrity') || t.includes('politician');
-      if (hasPerson && hasPersonName) return 'person';
-      if (isImg) return 'image';
-      return false;
+        'image of', 'picture of', 'draw me', 'create art',
+        'make a photo', 'generate the image'
+      ];
+      return imageWords.some(k => t.includes(k));
     }
 
-    // ====== IMAGE GENERATION (for non-people) ======
-    function generateImage(prompt) {
-      const clean = prompt
-        .replace(/generate image of|create image of|draw|make image of|image of|picture of|draw me|create art of|generate a picture of|make a photo of/gi, '')
+    // DETECT IF REAL PERSON
+    function isRealPerson(text) {
+      const t = text.toLowerCase();
+      return REAL_PEOPLE.some(k => t.includes(k));
+    }
+
+    // CLEAN PROMPT
+    function cleanPrompt(text) {
+      return text
+        .replace(/hi |hello |generate the image of|generate image of|create image of|draw|make image of|image of|picture of|draw me|create art of|generate a picture of|make a photo of|generate photo of|show me/gi, '')
         .trim();
-      return `https://image.pollinations.ai/prompt/${encodeURIComponent(clean + ', high quality, detailed')}?width=512&height=512&nologo=true`;
     }
 
-    // ====== NEEDS SEARCH ======
+    // GENERATE AI IMAGE
+    function generateImage(prompt) {
+      const enhanced = prompt + ', ultra realistic, high quality, 4k, detailed, sharp focus, professional photography';
+      return `https://image.pollinations.ai/prompt/${encodeURIComponent(enhanced)}?width=768&height=768&model=flux&nologo=true&enhance=true&seed=${Math.floor(Math.random() * 9999)}`;
+    }
+
+    // NEEDS SEARCH
     function needsSearch(text) {
       const keywords = [
         'who is', 'what is', 'when did', 'where is', 'latest', 'current',
@@ -265,7 +278,7 @@ STRICT RULES:
       return keywords.some(k => text.toLowerCase().includes(k));
     }
 
-    // ====== WEB SEARCH ======
+    // WEB SEARCH
     async function searchWeb(query) {
       try {
         const res = await fetch('https://api.tavily.com/search', {
@@ -286,10 +299,10 @@ STRICT RULES:
       } catch { return null; }
     }
 
-    // ====== VOICE INPUT ======
+    // VOICE INPUT
     function toggleVoice() {
       if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        addMessage('ai', 'Voice not supported here. Please use Chrome browser!');
+        addMessage('ai', 'Voice not supported here. Please use Chrome!');
         return;
       }
       if (isListening) { recognition.stop(); return; }
@@ -303,7 +316,7 @@ STRICT RULES:
       recognition.onstart = () => {
         isListening = true;
         document.getElementById('voiceBtn').classList.add('listening');
-        document.getElementById('userInput').placeholder = '&#127908; Listening...';
+        document.getElementById('userInput').placeholder = 'Listening...';
       };
 
       recognition.onresult = (e) => {
@@ -329,7 +342,7 @@ STRICT RULES:
       recognition.start();
     }
 
-    // ====== VOICE OUTPUT ======
+    // VOICE OUTPUT
     function speakText(text) {
       if (!synth) return;
       synth.cancel();
@@ -341,7 +354,7 @@ STRICT RULES:
       synth.speak(utt);
     }
 
-    // ====== SEND MESSAGE ======
+    // SEND MESSAGE
     async function sendMessage() {
       if (isLoading) return;
       const input = document.getElementById('userInput');
@@ -358,35 +371,26 @@ STRICT RULES:
       addMessage('user', text, false, wasVoice);
       messages.push({ role: 'user', content: text });
 
-      const imgType = isImageRequest(text);
-
-      // PERSON PHOTO REQUEST
-      if (imgType === 'person') {
+      // IMAGE REQUEST
+      if (isImageRequest(text)) {
         const typingId = showTyping();
+        const clean = cleanPrompt(text);
+        const personRequest = isRealPerson(text);
+
         setTimeout(() => {
           removeTyping(typingId);
-          const searchQuery = encodeURIComponent(text.replace(/photo of|pic of|picture of|image of|show me|generate|create/gi, '').trim());
-          addPersonMessage(text, searchQuery);
-          if (wasVoice) speakText("I can't generate real people's photos accurately. Here's a Google search link for you!");
-          messages.push({ role: 'assistant', content: `Provided Google search link for: ${text}` });
+          if (personRequest) {
+            addPersonMessage(clean);
+            if (wasVoice) speakText('I found some search links to help you find that photo!');
+          } else {
+            const imgUrl = generateImage(clean);
+            addImageMessage(imgUrl, clean);
+            if (wasVoice) speakText('Here is your generated image!');
+          }
+          messages.push({ role: 'assistant', content: `Image request handled for: ${clean}` });
           saveToHistory(text);
           isLoading = false;
-        }, 800);
-        return;
-      }
-
-      // AI IMAGE GENERATION
-      if (imgType === 'image') {
-        const typingId = showTyping();
-        setTimeout(() => {
-          removeTyping(typingId);
-          const imgUrl = generateImage(text);
-          addImageMessage(imgUrl, text);
-          if (wasVoice) speakText('Here is your generated image!');
-          messages.push({ role: 'assistant', content: `Generated image for: ${text}` });
-          saveToHistory(text);
-          isLoading = false;
-        }, 1500);
+        }, 1000);
         return;
       }
 
@@ -447,7 +451,6 @@ STRICT RULES:
 
         messages.push({ role: 'assistant', content: reply });
         if (messages.length > MAX_MEMORY) messages = messages.slice(-MAX_MEMORY);
-
         saveToHistory(text);
 
       } catch {
@@ -458,7 +461,7 @@ STRICT RULES:
       isLoading = false;
     }
 
-    // ====== ADD TEXT MESSAGE ======
+    // ADD TEXT MESSAGE
     function addMessage(role, text, searched = false, isVoice = false) {
       const msgs = document.getElementById('messages');
       const div = document.createElement('div');
@@ -472,7 +475,9 @@ STRICT RULES:
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
         .replace(/\n/g, '<br/>');
 
-      const voiceTag = (role === 'user' && isVoice) ? '<span class="voice-tag"><i class="fas fa-microphone"></i> voice</span>' : '';
+      const voiceTag = (role === 'user' && isVoice)
+        ? '<span class="voice-tag"><i class="fas fa-microphone"></i> voice</span>'
+        : '';
 
       div.innerHTML = `
         ${role === 'ai' ? '<div class="ai-avatar-small"><i class="fas fa-robot"></i></div>' : ''}
@@ -480,7 +485,7 @@ STRICT RULES:
           ${role === 'ai' ? `
             <div class="msg-header">
               <span class="ai-name">Elvix AI${searched ? ' <span class="web-badge">&#127758; web</span>' : ''}</span>
-              <button class="speak-btn" onclick="speakText(this.closest('.bubble').querySelector('p').innerText)" title="Read aloud">
+              <button class="speak-btn" onclick="speakText(this.closest('.bubble').querySelector('p').innerText)">
                 <i class="fas fa-volume-up"></i>
               </button>
             </div>` : ''}
@@ -495,28 +500,29 @@ STRICT RULES:
       animateIn(div);
     }
 
-    // ====== ADD PERSON SEARCH MESSAGE ======
-    function addPersonMessage(query, searchQuery) {
+    // ADD PERSON SEARCH MESSAGE
+    function addPersonMessage(query) {
       const msgs = document.getElementById('messages');
       const div = document.createElement('div');
       div.classList.add('message', 'ai-msg');
+      const encoded = encodeURIComponent(query);
 
       div.innerHTML = `
         <div class="ai-avatar-small"><i class="fas fa-robot"></i></div>
         <div class="bubble">
           <div class="msg-header">
-            <span class="ai-name">Elvix AI <span class="search-badge">&#128269; search</span></span>
+            <span class="ai-name">Elvix AI <span class="search-badge">&#128269; photo search</span></span>
           </div>
-          <p>I can't generate accurate photos of real people. But here are the best ways to find the photo you need!</p>
+          <p>I can't generate accurate photos of real people. Click below to find the real photo!</p>
           <div class="search-links">
-            <a href="https://www.google.com/search?q=${searchQuery}&tbm=isch" target="_blank" class="search-link google">
+            <a href="https://www.google.com/search?q=${encoded}&tbm=isch" target="_blank" class="search-link google">
               <i class="fab fa-google"></i> Google Images
             </a>
-            <a href="https://www.bing.com/images/search?q=${searchQuery}" target="_blank" class="search-link bing">
+            <a href="https://www.bing.com/images/search?q=${encoded}" target="_blank" class="search-link bing">
               <i class="fas fa-search"></i> Bing Images
             </a>
-            <a href="https://www.google.com/search?q=${searchQuery}" target="_blank" class="search-link wiki">
-              <i class="fas fa-info-circle"></i> Google Search
+            <a href="https://www.google.com/search?q=${encoded}+wikipedia" target="_blank" class="search-link wiki">
+              <i class="fas fa-info-circle"></i> Wikipedia
             </a>
           </div>
           <span class="msg-time">${getTime()}</span>
@@ -528,7 +534,7 @@ STRICT RULES:
       animateIn(div);
     }
 
-    // ====== ADD IMAGE MESSAGE ======
+    // ADD AI IMAGE MESSAGE
     function addImageMessage(imgUrl, prompt) {
       const msgs = document.getElementById('messages');
       const div = document.createElement('div');
@@ -541,12 +547,17 @@ STRICT RULES:
             <span class="ai-name">Elvix AI <span class="img-badge">&#127912; image</span></span>
           </div>
           <p style="font-size:0.78rem;color:rgba(255,255,255,0.4);margin-bottom:0.5rem;">${prompt}</p>
-          <div class="img-container">
-            <img src="${imgUrl}" alt="Generated" onload="this.parentElement.classList.add('loaded')" onerror="this.parentElement.innerHTML='<p style=padding:1rem;color:rgba(255,255,255,0.4)>Image failed. Try a different description!</p>'"/>
-            <div class="img-loading"><i class="fas fa-spinner fa-spin"></i> Generating...</div>
+          <div class="img-container" id="img-${Date.now()}">
+            <img
+              src="${imgUrl}"
+              alt="Generated"
+              onload="this.parentElement.classList.add('loaded')"
+              onerror="this.parentElement.innerHTML='<p style=padding:1rem;color:rgba(255,255,255,0.4);text-align:center>&#128247; Generation failed.<br/>Try a different description!</p>'"
+            />
+            <div class="img-loading"><i class="fas fa-spinner fa-spin"></i> Generating image...</div>
           </div>
           <a href="${imgUrl}" target="_blank" class="download-btn">
-            <i class="fas fa-download"></i> Download
+            <i class="fas fa-download"></i> Download Image
           </a>
           <span class="msg-time">${getTime()}</span>
         </div>
@@ -557,7 +568,7 @@ STRICT RULES:
       animateIn(div);
     }
 
-    // ====== ANIMATE IN ======
+    // ANIMATE IN
     function animateIn(div) {
       div.style.opacity = '0';
       div.style.transform = 'translateY(16px)';
@@ -568,7 +579,7 @@ STRICT RULES:
       });
     }
 
-    // ====== TYPING ======
+    // TYPING INDICATOR
     function showTyping() {
       const msgs = document.getElementById('messages');
       const id = 'typing-' + Date.now();
@@ -602,7 +613,7 @@ STRICT RULES:
 
     function sendSuggestion(el) {
       voiceUsed = false;
-      document.getElementById('userInput').value = el.textContent.replace(/[^\w\s]/gi, '').trim();
+      document.getElementById('userInput').value = el.textContent.replace(/[^\w\s,\-]/gi, '').trim();
       sendMessage();
     }
 
@@ -639,9 +650,9 @@ STRICT RULES:
           <h2>Hi! I'm <span>Elvix AI</span></h2>
           <p>India's smartest student tech assistant.<br/>Final year projects, apps, web dev — I got you!</p>
           <div class="suggestions">
-            <button class="suggest-btn" onclick="sendSuggestion(this)">Give me final year project ideas</button>
-            <button class="suggest-btn" onclick="sendSuggestion(this)">Help me build an Android app</button>
-            <button class="suggest-btn" onclick="sendSuggestion(this)">Generate image of mountains</button>
+            <button class="suggest-btn" onclick="sendSuggestion(this)">Give me project ideas</button>
+            <button class="suggest-btn" onclick="sendSuggestion(this)">Help with Android app</button>
+            <button class="suggest-btn" onclick="sendSuggestion(this)">Generate image of sunset</button>
             <button class="suggest-btn" onclick="sendSuggestion(this)">Latest tech news today</button>
           </div>
         </div>
